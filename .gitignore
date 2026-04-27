@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules/
+target/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Local environment
+.env
+.env.local
+*.db
+*.db-journal
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
