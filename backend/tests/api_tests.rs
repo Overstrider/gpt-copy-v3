@@ -103,6 +103,27 @@ async fn chat_persists_user_and_mocked_assistant_messages() {
 }
 
 #[tokio::test]
+async fn chat_stream_returns_token_and_done_events() {
+    let app = test_app().await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/chat/stream")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({ "message": "hello" }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let stream = String::from_utf8(body.to_vec()).unwrap();
+    assert!(stream.contains("event: token"));
+    assert!(stream.contains("event: done"));
+}
+
+#[tokio::test]
 async fn conversations_can_be_created_and_listed() {
     let app = test_app().await;
     let response = app

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Bot, Menu, MessageSquare, Send, UserRound, Wifi } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { fetchConversations, fetchHealth, Message, sendChat } from "@/lib/api";
+import { fetchConversations, fetchHealth, Message, streamChat } from "@/lib/api";
 import { useMemo, useState } from "react";
 
 export function ChatApp() {
@@ -12,24 +12,61 @@ export function ChatApp() {
   const [activeConversation, setActiveConversation] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
 
   const health = useQuery({ queryKey: ["health"], queryFn: fetchHealth, retry: false });
   const conversations = useQuery({ queryKey: ["conversations"], queryFn: fetchConversations, retry: false });
-  const chat = useMutation({
-    mutationFn: () => sendChat(message, activeConversation),
-    onSuccess: (response) => {
-      setActiveConversation(response.conversation_id);
-      setMessages((current) => [...current, response.user_message, response.assistant_message]);
-      setMessage("");
-    },
-  });
 
-  const canSend = message.trim().length > 0 && !chat.isPending;
+  const canSend = message.trim().length > 0 && !streaming;
   const status = useMemo(() => {
     if (health.isLoading) return { label: "Checking", tone: "text-zinc-300" };
     if (health.isError) return { label: "Offline", tone: "text-red-300" };
     return { label: "Healthy", tone: "text-emerald-300" };
   }, [health.isError, health.isLoading]);
+
+  async function submitMessage() {
+    if (!canSend) return;
+    const content = message.trim();
+    const conversationId = activeConversation ?? `pending-${Date.now()}`;
+    const userMessage: Message = {
+      id: `local-user-${Date.now()}`,
+      conversation_id: conversationId,
+      role: "user",
+      content,
+      created_at: new Date().toISOString(),
+    };
+    const assistantId = `local-assistant-${Date.now()}`;
+    const assistantMessage: Message = {
+      id: assistantId,
+      conversation_id: conversationId,
+      role: "assistant",
+      content: "",
+      created_at: new Date().toISOString(),
+    };
+    setMessages((current) => [...current, userMessage, assistantMessage]);
+    setMessage("");
+    setStreamError(null);
+    setStreaming(true);
+    try {
+      await streamChat(
+        content,
+        activeConversation,
+        (token) => {
+          setMessages((current) =>
+            current.map((item) =>
+              item.id === assistantId ? { ...item, content: `${item.content}${token} ` } : item,
+            ),
+          );
+        },
+        (nextConversationId) => setActiveConversation(nextConversationId),
+      );
+    } catch (error) {
+      setStreamError((error as Error).message);
+    } finally {
+      setStreaming(false);
+    }
+  }
 
   return (
     <main className="flex min-h-screen bg-zinc-950 text-zinc-100">
@@ -110,20 +147,20 @@ export function ChatApp() {
           className="border-t border-zinc-800 p-4"
           onSubmit={(event) => {
             event.preventDefault();
-            if (canSend) chat.mutate();
+            void submitMessage();
           }}
         >
-          {chat.isError ? (
+          {streamError ? (
             <div className="mx-auto mb-3 flex max-w-3xl items-center gap-2 rounded-md border border-red-900 bg-red-950 px-3 py-2 text-sm text-red-200">
               <AlertCircle className="h-4 w-4" />
-              {(chat.error as Error).message}
+              {streamError}
             </div>
           ) : null}
           <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-2">
             <textarea
               aria-label="Message"
               className="max-h-40 min-h-12 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-zinc-500"
-              placeholder="Message GPT Copy"
+              placeholder={streaming ? "Streaming response..." : "Message GPT Copy"}
               value={message}
               onChange={(event) => setMessage(event.target.value)}
             />
