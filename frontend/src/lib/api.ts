@@ -55,3 +55,38 @@ export async function sendChat(message: string, conversationId?: string) {
   });
   return parseJson(response, ChatResponseSchema);
 }
+
+export async function streamChat(
+  message: string,
+  conversationId: string | undefined,
+  onToken: (token: string) => void,
+  onDone: (conversationId: string) => void,
+) {
+  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, conversation_id: conversationId }),
+  });
+  if (!response.ok || !response.body) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error?.message ?? "Streaming request failed");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+    for (const event of events) {
+      const type = event.match(/^event: (.+)$/m)?.[1];
+      const data = event.match(/^data: (.*)$/m)?.[1] ?? "";
+      if (type === "token") onToken(data);
+      if (type === "done") onDone(data);
+      if (type === "error") throw new Error(data);
+    }
+  }
+}

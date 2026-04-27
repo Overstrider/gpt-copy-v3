@@ -39,27 +39,24 @@ describe("ChatApp", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          conversation_id: "c1",
-          user_message: { id: "u1", conversation_id: "c1", role: "user", content: "Hello", created_at: "now" },
-          assistant_message: {
-            id: "a1",
-            conversation_id: "c1",
-            role: "assistant",
-            content: "Hi from the backend",
-            created_at: "now",
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("event: token\ndata: Hi\n\n"));
+            controller.enqueue(new TextEncoder().encode("event: token\ndata: backend\n\n"));
+            controller.enqueue(new TextEncoder().encode("event: done\ndata: c1\n\n"));
+            controller.close();
           },
         }),
-    });
+      });
     global.fetch = fetchMock;
     renderChat();
 
     await userEvent.type(screen.getByLabelText("Message"), "Hello");
     await userEvent.click(screen.getByLabelText("Send message"));
 
-    await waitFor(() => expect(screen.getByText("Hi from the backend")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Hi backend/)).toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/api/chat",
+      "http://localhost:8080/api/chat/stream",
       expect.objectContaining({ method: "POST" }),
     );
   });

@@ -11,13 +11,10 @@ test("sends a chat message", async ({ page }) => {
       await route.fulfill({ json: { id: "c1", title: "New chat", created_at: "now", updated_at: "now" } });
     }
   });
-  await page.route("**/api/chat", async (route) => {
+  await page.route("**/api/chat/stream", async (route) => {
     await route.fulfill({
-      json: {
-        conversation_id: "c1",
-        user_message: { id: "u1", conversation_id: "c1", role: "user", content: "Hello", created_at: "now" },
-        assistant_message: { id: "a1", conversation_id: "c1", role: "assistant", content: "Hello back", created_at: "now" },
-      },
+      contentType: "text/event-stream",
+      body: "event: token\ndata: Hello\n\nevent: token\ndata: back\n\nevent: done\ndata: c1\n\n",
     });
   });
 
