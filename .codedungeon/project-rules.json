@@ -2,9 +2,9 @@
   "status": "approved",
   "rules_path": ".codedungeon/project-rules.md",
   "compact_path": ".codedungeon/project-rules.compact.md",
-  "source_digest": "4c4565bfc2dd0725143f2be9c9569e55b424430849cdf812d19bad8ca010bd44",
+  "source_digest": "d1760beea7c63c2e03adf444e28b6db529760bf942245ef5792e62b0b9c8aea9",
   "rules_digest": "01ae5bd2f28a00f7f8899243fdbc014d9ca2efcd3889f8ed545338094745a57c",
-  "approved_at": "2026-04-27T16:33:57Z",
+  "approved_at": "2026-04-27T16:41:17Z",
   "approved_by": "codex",
   "sources": [
     ".env.example",
