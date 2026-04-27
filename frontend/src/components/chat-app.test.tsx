@@ -26,11 +26,32 @@ function renderChat() {
 }
 
 describe("ChatApp", () => {
+  it("shows backend loading state", () => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.endsWith("/health")) return new Promise<Response>(() => undefined);
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    });
+    renderChat();
+    expect(screen.getByLabelText("Backend Checking")).toBeInTheDocument();
+  });
+
   it("shows backend health state", async () => {
     global.fetch = mockFetchOnce({ status: "ok" });
     renderChat();
     expect(await screen.findByLabelText("Backend Healthy")).toBeInTheDocument();
   });
+
+  it("shows backend error state", async () => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.endsWith("/health")) return Promise.reject(new Error("offline"));
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    });
+    renderChat();
+    expect(await screen.findByLabelText("Backend Offline")).toBeInTheDocument();
+  });
+
 
   it("sends a message and renders the assistant reply", async () => {
     const fetchMock = vi
